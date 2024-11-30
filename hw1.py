@@ -22,6 +22,35 @@ def smoothed_prob(arr, alpha=1):
         return ((arr + alpha) / (_sum + arr.size * alpha)).tolist()
     else:
         return ((arr + 1) / arr.size).tolist()
+    
+def get_dataset(train, test):
+    """ Parse Datasets"""
+
+    train_dataset = []
+    with open(train, 'r') as t:
+        for sentence in t:
+            pairs = [("START", "START")]
+            for pair in sentence.split(' '):
+                splitted = pair.split("=")
+                pair_tup = (splitted[0], splitted[1])
+                pairs.append(pair_tup)
+            pairs.append(("END", "END"))
+            train_dataset.append(pairs)
+    # print(train_sentences[0])
+
+    test_dataset = []
+    with open(test, 'r') as t:
+        for sentence in t:
+            words = ["START"]
+            for word in sentence.split(' '):
+                splitted = word.split("=")
+                words.append(splitted[0])
+            words.append("END")
+            test_dataset.append(words)
+    #print(test_dataset)
+
+    return train_dataset, test_dataset
+
 
 def baseline(train, test):
     '''
@@ -31,7 +60,45 @@ def baseline(train, test):
     output: list of sentences, each sentence is a list of (word,tag) pairs.
             E.g., [[(word1, tag1), (word2, tag2)], [(word3, tag3), (word4, tag4)]]
     '''
-    raise NotImplementedError("You need to write this part!")
+    
+    train_dataset, test_dataset = get_dataset(train, test)
+
+    # word별 tag 빈도 Count하기
+    tag_counts = defaultdict(list)  # '<word>' : [<tag>, <tag>]
+    for sentence in train_dataset:
+        for pair in sentence[1:-1]:
+            tag_counts[pair[0]].append(pair[1])
+    
+    
+    total_word_counts = 0  # 모든 단어 빈도
+    max_seen_word_count = 0 # 가장 많이 출현한 단어의 출현 횟수 (int)
+    for word, tags in tag_counts.items():
+        tag_counts[word] = [Counter(tags), dict()]  # '<word>' : [Counter({<tag>: 20}, dict(): tag 빈도 계산])
+        freq = 0  # 문서 내 해당 단어의 빈도 == sum of tags per word
+        print(tag_counts[word][0])
+        for tag in tag_counts[word][0]:
+            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
+            freq += counts_per_tag
+        total_word_counts += freq  # 전체 단어 수 합산
+
+        """여기 다시 해야 함."""
+        max_prob = 0
+        for tag in tag_counts[word][0]:
+            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
+            tag_proportion_in_a_word = counts_per_tag / freq
+            tag_counts[word][1][tag] = tag_proportion_in_a_word
+            max_prob = max(max_prob, tag_proportion_in_a_word)
+        
+        tag_counts[word][1]['max_prob'] = max_prob
+    
+    for k, v in tag_counts.items():
+        print(k)
+
+
+
+                    
+
+    # raise NotImplementedError("You need to write this part!")
 
 
 def viterbi(train, test):
@@ -55,3 +122,6 @@ def viterbi_ec(train, test):
             E.g., [[(word1, tag1), (word2, tag2)], [(word3, tag3), (word4, tag4)]]
     '''
     raise NotImplementedError("You need to write this part!")
+
+if __name__ == "__main__":
+        baseline('./data/brown-training.txt', './data/brown-test.txt')
