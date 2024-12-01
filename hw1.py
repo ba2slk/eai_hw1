@@ -51,6 +51,47 @@ def get_dataset(train, test):
 
     return train_dataset, test_dataset
 
+def get_tag_info(train_dataset):
+    # word별 tag 빈도 Count하기
+    tag_counts = defaultdict(list)  # '<word>' : [<tag>, <tag>]
+    for sentence in train_dataset:
+        for pair in sentence[1:-1]:
+            tag_counts[pair[0]].append(pair[1])
+    
+    
+    total_word_counts = 0  # 모든 단어 빈도
+    for word, tags in tag_counts.items():
+        tag_counts[word] = [Counter(tags), dict()]  # '<word>' : [Counter({<tag>: 20}, dict(): tag 빈도 계산])
+        word_freq = 0  # 문서 내 해당 단어의 빈도 == sum of tags per word
+        for tag in tag_counts[word][0]:
+            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
+            word_freq += counts_per_tag
+        total_word_counts += word_freq  # 전체 단어 수 합산
+
+        max_prob = 0
+        max_tag = None
+        for tag in tag_counts[word][0]:
+            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
+            tag_proportion_in_a_word = counts_per_tag / word_freq
+            tag_counts[word][1][tag] = tag_proportion_in_a_word
+            if tag_proportion_in_a_word > max_prob:
+                max_prob = tag_proportion_in_a_word
+                max_tag = tag
+        
+        tag_counts[word][1]['max_prob'] = max_prob
+        tag_counts[word][1]['max_tag'] = max_tag
+        tag_counts[word][1]['word_freq'] = word_freq
+
+    # Unseen Word에 대한
+    max_seen_word_count = 0 # 가장 많이 출현한 단어의 출현 횟수 (int)
+    for word, meta in tag_counts.items():
+        max_seen_word_count = max(max_seen_word_count, meta[1]['word_freq'])
+    max_seen_probability = max_seen_word_count / total_word_counts 
+
+    return tag_counts, max_seen_probability
+
+
+
 
 def baseline(train, test):
     '''
@@ -62,44 +103,11 @@ def baseline(train, test):
     '''
     
     train_dataset, test_dataset = get_dataset(train, test)
+    word_tag_info, max_seen_probability = get_tag_info(train_dataset)
 
-    # word별 tag 빈도 Count하기
-    tag_counts = defaultdict(list)  # '<word>' : [<tag>, <tag>]
-    for sentence in train_dataset:
-        for pair in sentence[1:-1]:
-            tag_counts[pair[0]].append(pair[1])
-    
-    
-    total_word_counts = 0  # 모든 단어 빈도
-    max_seen_word_count = 0 # 가장 많이 출현한 단어의 출현 횟수 (int)
-    for word, tags in tag_counts.items():
-        tag_counts[word] = [Counter(tags), dict()]  # '<word>' : [Counter({<tag>: 20}, dict(): tag 빈도 계산])
-        freq = 0  # 문서 내 해당 단어의 빈도 == sum of tags per word
-        print(tag_counts[word][0])
-        for tag in tag_counts[word][0]:
-            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
-            freq += counts_per_tag
-        total_word_counts += freq  # 전체 단어 수 합산
+    print(max_seen_probability)
 
-        """여기 다시 해야 함."""
-        max_prob = 0
-        for tag in tag_counts[word][0]:
-            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
-            tag_proportion_in_a_word = counts_per_tag / freq
-            tag_counts[word][1][tag] = tag_proportion_in_a_word
-            max_prob = max(max_prob, tag_proportion_in_a_word)
-        
-        tag_counts[word][1]['max_prob'] = max_prob
-    
-    for k, v in tag_counts.items():
-        print(k)
-
-
-
-                    
-
-    # raise NotImplementedError("You need to write this part!")
-
+    print(word_tag_info['unconscious'])
 
 def viterbi(train, test):
 
