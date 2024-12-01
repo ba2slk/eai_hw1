@@ -23,6 +23,34 @@ def smoothed_prob(arr, alpha=1):
     else:
         return ((arr + 1) / arr.size).tolist()
     
+def get_dataset(train, test):
+    """ Parse Datasets"""
+
+    train_dataset = []
+    with open(train, 'r') as t:
+        for sentence in t:
+            pairs = [("START", "START")]
+            for pair in sentence.split(' '):
+                splitted = pair.split("=")
+                pair_tup = (splitted[0], splitted[1])
+                pairs.append(pair_tup)
+            pairs.append(("END", "END"))
+            train_dataset.append(pairs)
+    # print(train_sentences[0])
+
+    test_dataset = []
+    with open(test, 'r') as t:
+        for sentence in t:
+            words = ["START"]
+            for word in sentence.split(' '):
+                splitted = word.split("=")
+                words.append(splitted[0])
+            words.append("END")
+            test_dataset.append(words)
+    #print(test_dataset)
+
+    return train_dataset, test_dataset
+    
 def get_tag_info(train_dataset):
     # word별 tag 출현 횟수 Count
     tag_counts = defaultdict(list)  # '<word>' : [<tag>, <tag>]
