@@ -23,72 +23,53 @@ def smoothed_prob(arr, alpha=1):
     else:
         return ((arr + 1) / arr.size).tolist()
     
-def get_dataset(train, test):
-    """ Parse Datasets"""
-
-    train_dataset = []
-    with open(train, 'r') as t:
-        for sentence in t:
-            pairs = [("START", "START")]
-            for pair in sentence.split(' '):
-                splitted = pair.split("=")
-                pair_tup = (splitted[0], splitted[1])
-                pairs.append(pair_tup)
-            pairs.append(("END", "END"))
-            train_dataset.append(pairs)
-    # print(train_sentences[0])
-
-    test_dataset = []
-    with open(test, 'r') as t:
-        for sentence in t:
-            words = ["START"]
-            for word in sentence.split(' '):
-                splitted = word.split("=")
-                words.append(splitted[0])
-            words.append("END")
-            test_dataset.append(words)
-    #print(test_dataset)
-
-    return train_dataset, test_dataset
-
 def get_tag_info(train_dataset):
-    # word별 tag 빈도 Count하기
+    # word별 tag 출현 횟수 Count
     tag_counts = defaultdict(list)  # '<word>' : [<tag>, <tag>]
     for sentence in train_dataset:
         for pair in sentence[1:-1]:
             tag_counts[pair[0]].append(pair[1])
-    
-    
-    total_word_counts = 0  # 모든 단어 빈도
+
+    pos_counts = defaultdict(int)   
     for word, tags in tag_counts.items():
         tag_counts[word] = [Counter(tags), dict()]  # '<word>' : [Counter({<tag>: 20}, dict(): tag 빈도 계산])
-        word_freq = 0  # 문서 내 해당 단어의 빈도 == sum of tags per word
-        for tag in tag_counts[word][0]:
-            counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
-            word_freq += counts_per_tag
-        total_word_counts += word_freq  # 전체 단어 수 합산
-
-        max_prob = 0
+        max_count = 0
         max_tag = None
         for tag in tag_counts[word][0]:
+            pos_counts[tag] += tag_counts[word][0][tag]
             counts_per_tag = tag_counts[word][0][tag]  # 한 단어 내 특정 태그의 개수
-            tag_proportion_in_a_word = counts_per_tag / word_freq
-            tag_counts[word][1][tag] = tag_proportion_in_a_word
-            if tag_proportion_in_a_word > max_prob:
-                max_prob = tag_proportion_in_a_word
+            tag_counts[word][1][tag] = counts_per_tag
+            if counts_per_tag > max_count:
+                max_count = counts_per_tag
                 max_tag = tag
         
-        tag_counts[word][1]['max_prob'] = max_prob
+        tag_counts[word][1]['max_count'] = max_count
         tag_counts[word][1]['max_tag'] = max_tag
-        tag_counts[word][1]['word_freq'] = word_freq
 
-    # Unseen Word에 대한
-    max_seen_word_count = 0 # 가장 많이 출현한 단어의 출현 횟수 (int)
-    for word, meta in tag_counts.items():
-        max_seen_word_count = max(max_seen_word_count, meta[1]['word_freq'])
-    max_seen_probability = max_seen_word_count / total_word_counts 
+    max_seen_tag = max(pos_counts, key=pos_counts.get) # 최다 출현 품사
 
-    return tag_counts, max_seen_probability
+    return tag_counts, max_seen_tag
+
+
+def get_tagged_result(test_dataset, word_tag_infos, max_seen_tag):
+    tagged_senteces_result = []
+    for sentence in test_dataset:
+        tagged_sentence = []
+        for word in sentence:
+            wt_pair = (None, None)
+            if word == "START" or word == "END":
+                wt_pair = (word, word)
+            else:
+                try: 
+                    tag_info = word_tag_infos[word]
+                    tag = tag_info[1]['max_tag']
+                    wt_pair = (word, tag)
+                except:
+                    wt_pair = (word, max_seen_tag)
+            tagged_sentence.append(wt_pair)
+        tagged_senteces_result.append(tagged_sentence)
+
+    return tagged_senteces_result
 
 
 
@@ -101,13 +82,14 @@ def baseline(train, test):
     output: list of sentences, each sentence is a list of (word,tag) pairs.
             E.g., [[(word1, tag1), (word2, tag2)], [(word3, tag3), (word4, tag4)]]
     '''
+
+    # Get tag infos and max_seen_tag
+    word_tag_infos, max_seen_tag = get_tag_info(train)
+
+    # Get tagged_sentences_result
+    tagged_sentences_result = get_tagged_result(test, word_tag_infos, max_seen_tag)
     
-    train_dataset, test_dataset = get_dataset(train, test)
-    word_tag_info, max_seen_probability = get_tag_info(train_dataset)
-
-    print(max_seen_probability)
-
-    print(word_tag_info['unconscious'])
+    return tagged_sentences_result
 
 def viterbi(train, test):
 
