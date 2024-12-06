@@ -23,9 +23,8 @@ def smoothed_prob(arr, alpha=1):
     else:
         return ((arr + 1) / arr.size).tolist()
     
+'''------author: ba2slk------'''    
 def get_dataset(train, test):
-    """ Parse Datasets"""
-
     train_dataset = []
     with open(train, 'r') as t:
         for sentence in t:
@@ -51,16 +50,22 @@ def get_dataset(train, test):
 
     return train_dataset, test_dataset
     
-def get_tag_info(train_dataset):
+def get_tag_info(train_dataset, discard_se=True):
     # word별 tag 출현 횟수 Count
     tag_counts = defaultdict(list)  # '<word>' : [<tag>, <tag>]
+    
+    
     for sentence in train_dataset:
-        for pair in sentence[1:-1]:
-            tag_counts[pair[0]].append(pair[1])
+        if discard_se:
+            for pair in sentence[1:-1]:
+                tag_counts[pair[0]].append(pair[1])
+        else:
+            for pair in sentence:
+                tag_counts[pair[0]].append(pair[1])
 
     pos_counts = defaultdict(int)   
     for word, tags in tag_counts.items():
-        tag_counts[word] = [Counter(tags), dict()]  # '<word>' : [Counter({<tag>: 20}, dict(): tag 빈도 계산])
+        tag_counts[word] = [Counter([tag.strip() for tag in tags]), dict()]  # '<word>' : [Counter({<tag>: 20}, dict(): tag 빈도 계산])
         max_count = 0
         max_tag = None
         for tag in tag_counts[word][0]:
@@ -76,7 +81,7 @@ def get_tag_info(train_dataset):
 
     max_seen_tag = max(pos_counts, key=pos_counts.get) # 최다 출현 품사
 
-    return tag_counts, max_seen_tag
+    return tag_counts, max_seen_tag, pos_counts
 
 
 def get_tagged_result(test_dataset, word_tag_infos, max_seen_tag):
@@ -100,8 +105,6 @@ def get_tagged_result(test_dataset, word_tag_infos, max_seen_tag):
     return tagged_senteces_result
 
 
-
-
 def baseline(train, test):
     '''
     Implementation for the baseline tagger.
@@ -110,9 +113,11 @@ def baseline(train, test):
     output: list of sentences, each sentence is a list of (word,tag) pairs.
             E.g., [[(word1, tag1), (word2, tag2)], [(word3, tag3), (word4, tag4)]]
     '''
+    # # Turn off before checking the performance with run.py
+    # train, test = get_dataset(train, test)
 
     # Get tag infos and max_seen_tag
-    word_tag_infos, max_seen_tag = get_tag_info(train)
+    word_tag_infos, max_seen_tag, _ = get_tag_info(train, discard_se=True)
 
     # Get tagged_sentences_result
     tagged_sentences_result = get_tagged_result(test, word_tag_infos, max_seen_tag)
@@ -128,6 +133,36 @@ def viterbi(train, test):
     output: list of sentences, each sentence is a list of (word,tag) pairs.
             E.g., [[(word1, tag1), (word2, tag2)], [(word3, tag3), (word4, tag4)]]
     '''
+
+    # Turn off before checking the performance with run.py
+    train, test = get_dataset(train, test)
+
+    word_tag_infos, _, pos_counts = get_tag_info(train, discard_se=False)
+
+
+    # 특정 태그가 특정 단어를 생성할 확률: Emission Probability
+    emission_probability = defaultdict(lambda: defaultdict(int))
+    for word, meta in word_tag_infos.items():
+        for tag in meta[0]:
+            word_counts_after_tag = meta[0][tag]
+            total_counts_of_a_tag = pos_counts[tag]
+            emission_probability[tag][word] = word_counts_after_tag / total_counts_of_a_tag # {<tag>: {<word>: <prob>, <word>: <prob>, ...}, ...}
+
+    # 특정 태그 뒤에 특정 태그가 올 확률: Transition Probability
+    transition_probability = defaultdict(lambda: defaultdict(int))
+    for sentence in train:
+        for i in range(len(sentence) - 1):
+            current_tag = sentence[i][1]
+            next_tag = sentence[i+1][1]
+            transition_probability[current_tag][next_tag] += 1
+            
+    """ 특정 태그 뒤에 특정 태그가오는 횟수 계산 --> 확률 계산해야 함."""
+
+
+    print(transition_probability)
+        
+
+            
 
     return 0       
 
@@ -147,3 +182,12 @@ def viterbi_ec(train, test):
 
 
 if __name__ == "__main__":
+    # For Personal Test
+    train = "./data/brown-training.txt"
+    test = "./data/brown-test.txt"
+
+    # result = baseline(train, test)
+    result = viterbi(train, test)
+    # result = viterbi_ec(train, test)
+
+    # print(result)
