@@ -139,6 +139,14 @@ def viterbi(train, test):
 
     word_tag_infos, _, pos_counts = get_tag_info(train, discard_se=False)
 
+    # for k, v in word_tag_infos.items():
+    #     print(k, v)
+
+    for k, v in pos_counts.items():
+        print(k, v)
+
+    
+
 
     # 특정 태그가 특정 단어를 생성할 확률: Emission Probability
     emission_probability = defaultdict(lambda: defaultdict(int))
@@ -164,11 +172,11 @@ def viterbi(train, test):
         for next_tag in next_tags.items():
             transition_probability[tag][next_tag[0]] = next_tag[1] / total_next_tags
     
-    for k, v in emission_probability.items():
-        print(k, v)
+    # for k, v in emission_probability.items():
+    #     print(k, v)
 
-    for k, v in transition_probability.items():
-        print(k, v)
+    # for k, v in transition_probability.items():
+    #     print(k, v)
             
 
     return 0       
