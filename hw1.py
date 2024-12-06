@@ -141,15 +141,12 @@ def viterbi(train, test):
 
     # for k, v in word_tag_infos.items():
     #     print(k, v)
-
-    for k, v in pos_counts.items():
-        print(k, v)
-
+    # for k, v in pos_counts.items():
+    #     print(k, v)
     
 
-
     # 특정 태그가 특정 단어를 생성할 확률: Emission Probability
-    emission_probability = defaultdict(lambda: defaultdict(int))
+    emission_probability = defaultdict(lambda: defaultdict(float))
     for word, meta in word_tag_infos.items():
         for tag in meta[0]:
             word_counts_after_tag = meta[0][tag]
@@ -157,7 +154,7 @@ def viterbi(train, test):
             emission_probability[tag][word] = word_counts_after_tag / total_counts_of_a_tag # {<tag>: {<word>: <prob>, <word>: <prob>, ...}, ...}
 
     # 특정 태그 뒤에 특정 태그가 올 확률: Transition Probability
-    transition_probability = defaultdict(lambda: defaultdict(int))
+    transition_probability = defaultdict(lambda: defaultdict(float))
     for sentence in train:
         for i in range(len(sentence) - 1):
             current_tag = sentence[i][1]
@@ -171,6 +168,47 @@ def viterbi(train, test):
                         
         for next_tag in next_tags.items():
             transition_probability[tag][next_tag[0]] = next_tag[1] / total_next_tags
+
+    # 초기 확률 분포 -> START 다음에 나오는 애들 확률로
+    initial_probability_distribution = transition_probability['START']
+    tag_state_space = pos_counts.keys()
+
+    # Unseen Word 처리
+    # for tag in tag_state_space:
+    #     if tag not in initial_probability_distribution:
+    #         initial_probability_distribution[tag] = EPSILON # epsilon
+    # print(initial_probability_distribution)
+    """ WARNING: 확률 합이 1이 안 됨. """
+
+
+    for k, v in emission_probability.items():
+        print(k, v)
+
+    
+    for sentence in test:
+        V = defaultdict(lambda: defaultdict(float))  # Viterbi Matrix
+        T = len(sentence) 
+
+        # START, END 제외
+        prev_tag = None
+        for i in range(1, T-1):
+            word = sentence[i]
+            max_prob = 0
+            for tag in tag_state_space:
+                ip = initial_probability_distribution[tag]
+                ep = emission_probability[tag][word]
+                if ip == 0: ip = EPSILON
+                if ep == 0: ep = EPSILON
+
+                if i == 1: # Initial
+                    V[word][tag] = log(ip) + log(ep)
+                    prev_tag = tag
+                    print(V[word][tag])
+                    continue
+
+                V[word][tag] = max(max_prob, V)
+
+
     
     # for k, v in emission_probability.items():
     #     print(k, v)
