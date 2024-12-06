@@ -155,13 +155,20 @@ def viterbi(train, test):
             current_tag = sentence[i][1]
             next_tag = sentence[i+1][1]
             transition_probability[current_tag][next_tag] += 1
-            
-    """ 특정 태그 뒤에 특정 태그가오는 횟수 계산 --> 확률 계산해야 함."""
+    
+    for tag, next_tags in transition_probability.items():
+        total_next_tags = 0
+        for _, counts in next_tags.items():
+            total_next_tags += counts
+                        
+        for next_tag in next_tags.items():
+            transition_probability[tag][next_tag[0]] = next_tag[1] / total_next_tags
+    
+    for k, v in emission_probability.items():
+        print(k, v)
 
-
-    print(transition_probability)
-        
-
+    for k, v in transition_probability.items():
+        print(k, v)
             
 
     return 0       
