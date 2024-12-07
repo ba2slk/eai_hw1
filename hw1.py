@@ -193,7 +193,7 @@ def viterbi(train, test):
 
         T = len(sentence) - 1
         V = np.full((T, len(tag_state_space)), -np.inf)
-        BT = np.zeros((T, len(tag_state_space))) # 꼭 수정하기
+        BT = np.zeros((T, len(tag_state_space)))
 
         prev_word_idx = 0
         for i in range(0, T):
@@ -250,16 +250,90 @@ def viterbi_ec(train, test):
             E.g., [[(word1, tag1), (word2, tag2)], [(word3, tag3), (word4, tag4)]]
     '''
 
-    raise NotImplementedError('viterbi_ec: not implemented')
+    word_tag_infos, _, pos_counts = get_tag_info(train, discard_se=False)
 
+    # 특정 태그가 특정 단어를 생성할 확률: Emission Probability
+    word_counts_by_tag = defaultdict(lambda: defaultdict(float))
+    for word, meta in word_tag_infos.items():
+        for tag in meta[0]:
+            tag_counts_by_word = meta[0][tag] # 한 단어가 어떤 품사로 몇 번씩 사용되었나
+            word_counts_by_tag[tag][word] = tag_counts_by_word # 특정 태그에 해당하는 단어들 각각의 등장 횟수
+
+
+    for k, v in word_counts_by_tag.items():
+        print(k, v)
+            # total_counts_of_a_tag = pos_counts[tag]
+            # emission_probability[tag][word] = word_counts_after_tag / total_counts_of_a_tag # {<tag>: {<word>: <prob>, <word>: <prob>, ...}, ...}
+
+    # 특정 태그 뒤에 특정 태그가 올 확률: Transition Probability
+    transition_probability = defaultdict(lambda: defaultdict(float))
+    for sentence in train:
+        for i in range(len(sentence) - 1):
+            current_tag = sentence[i][1]
+            next_tag = sentence[i+1][1]
+            transition_probability[current_tag][next_tag] += 1
+    
+    for tag, next_tags in transition_probability.items():
+        total_next_tags = 0
+        for _, counts in next_tags.items():
+            total_next_tags += counts
+                        
+        for next_tag in next_tags.items():
+            transition_probability[tag][next_tag[0]] = next_tag[1] / total_next_tags
+
+    # 초기 확률 분포 -> START 다음에 나오는 애들 확률로
+    initial_probability_distribution = transition_probability['START']
+    tag_state_space = list(pos_counts.keys())
+    
+    tagged_sentences_result = []
+    for sentence in test:
+        tagged_sentence = [("END", "END")]
+
+        T = len(sentence) - 1
+        V = np.full((T, len(tag_state_space)), -np.inf)
+        BT = np.zeros((T, len(tag_state_space)))
+
+        prev_word_idx = 0
+        for i in range(0, T):
+            curr_word_idx = i
+            for curr_tag_idx in range(len(tag_state_space)):
+                curr_tag = tag_state_space[curr_tag_idx]
+                curr_word = sentence[curr_word_idx]
+                ep = "***"  #❗ 수정
+                if i == 0:
+                    ip = initial_probability_distribution[curr_tag]
+                    V[curr_word_idx][curr_tag_idx] = np.log(ip + EPSILON) + ep
+                    BT[curr_word_idx][curr_tag_idx] = curr_tag_idx
+                else:
+                    max_prob = -np.inf
+                    max_prev_tag_idx = -1
+                    for prev_tag_idx in range(len(tag_state_space)):
+                        prev_tag = tag_state_space[prev_tag_idx]
+                        tp = transition_probability[prev_tag][curr_tag]
+                        candidate_prob = V[prev_word_idx][prev_tag_idx] + np.log(tp + EPSILON) + ep
+                        if candidate_prob > max_prob:
+                            max_prob = candidate_prob
+                            max_prev_tag_idx = prev_tag_idx
+                    V[curr_word_idx][curr_tag_idx] = max_prob
+                    BT[curr_word_idx][curr_tag_idx] = max_prev_tag_idx
+            prev_word_idx = i
+
+        last_word_idx = prev_word_idx
+        max_prob = np.max(V[last_word_idx])
+        last_word_tag_idx = np.argmax(V[last_word_idx])
+        tagged_sentence.append((sentence[last_word_idx], tag_state_space[last_word_tag_idx]))
+        prev_tag_idx = int(BT[last_word_idx][last_word_tag_idx])
+
+        for curr_word_idx in range (T-2, 0, -1):
+            curr_word = sentence[curr_word_idx]
+            tagged_sentence.append((curr_word, tag_state_space[prev_tag_idx]))
+            prev_tag_idx = int(BT[curr_word_idx][prev_tag_idx])
+
+        tagged_sentence.append(("START", "START"))
+        tagged_sentence.reverse()
+        tagged_sentences_result.append(tagged_sentence)
+        
+    return tagged_sentences_result
 
 if __name__ == "__main__":
-    # For Personal Test
-    train = "./data/brown-training.txt"
-    test = "./data/brown-test.txt"
-
-    # result = baseline(train, test)
-    result = viterbi(train, test)
-    # result = viterbi_ec(train, test)
-
-    # print(result)
+    print(smoothed_prob([1, 1, 1, 2], alpha=1))
