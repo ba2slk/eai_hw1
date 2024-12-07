@@ -187,7 +187,7 @@ def viterbi(train, test):
     tagged_sentences_result = []
     for sentence in test:
         #sentence = test[0]
-        tagged_sentence = [("START", "START")]
+        tagged_sentence = [("END", "END")]
         # V = defaultdict(lambda: defaultdict(float))  # Viterbi Matrix -> 각 단계에서의 최대 확률 저장
         # BT = defaultdict(lambda: defaultdict(str))
 
@@ -201,10 +201,10 @@ def viterbi(train, test):
             for curr_tag_idx in range(len(tag_state_space)):
                 curr_tag = tag_state_space[curr_tag_idx]
                 curr_word = sentence[curr_word_idx]
-                ep = emission_probability[curr_tag][curr_word]
+                ep = np.log(emission_probability[curr_tag][curr_word] + EPSILON)
                 if i == 0:
                     ip = initial_probability_distribution[curr_tag]
-                    V[curr_word_idx][curr_tag_idx] = safe_log(ip) + safe_log(ep)
+                    V[curr_word_idx][curr_tag_idx] = np.log(ip + EPSILON) + ep
                     BT[curr_word_idx][curr_tag_idx] = curr_tag_idx
                 else:
                     max_prob = -np.inf
@@ -212,7 +212,7 @@ def viterbi(train, test):
                     for prev_tag_idx in range(len(tag_state_space)):
                         prev_tag = tag_state_space[prev_tag_idx]
                         tp = transition_probability[prev_tag][curr_tag]
-                        candidate_prob = V[prev_word_idx][prev_tag_idx] + safe_log(tp) + safe_log(ep)
+                        candidate_prob = V[prev_word_idx][prev_tag_idx] + np.log(tp + EPSILON) + ep
                         if candidate_prob > max_prob:
                             max_prob = candidate_prob
                             max_prev_tag_idx = prev_tag_idx
@@ -223,16 +223,18 @@ def viterbi(train, test):
         last_word_idx = prev_word_idx
         max_prob = np.max(V[last_word_idx])
         last_word_tag_idx = np.argmax(V[last_word_idx])
-        tagged_sentence.insert(1, (sentence[last_word_idx], tag_state_space[last_word_tag_idx]))
+        # tagged_sentence.insert(1, (sentence[last_word_idx], tag_state_space[last_word_tag_idx]))
+        tagged_sentence.append((sentence[last_word_idx], tag_state_space[last_word_tag_idx]))
         prev_tag_idx = int(BT[last_word_idx][last_word_tag_idx])
 
         for curr_word_idx in range (T-2, 0, -1):
             curr_word = sentence[curr_word_idx]
-            tagged_sentence.insert(1, (curr_word, tag_state_space[prev_tag_idx]))
+            # tagged_sentence.insert(1, (curr_word, tag_state_space[prev_tag_idx]))
+            tagged_sentence.append((curr_word, tag_state_space[prev_tag_idx]))
             prev_tag_idx = int(BT[curr_word_idx][prev_tag_idx])
 
-        tagged_sentence.append(("END", "END"))
-    
+        tagged_sentence.append(("START", "START"))
+        tagged_sentence.reverse()
         tagged_sentences_result.append(tagged_sentence)
         
     return tagged_sentences_result
