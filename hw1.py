@@ -104,6 +104,8 @@ def get_tagged_result(test_dataset, word_tag_infos, max_seen_tag):
 
     return tagged_senteces_result
 
+def safe_log (probability):
+    return np.log(probability + EPSILON)
 
 def baseline(train, test):
     '''
@@ -124,6 +126,7 @@ def baseline(train, test):
     
     return tagged_sentences_result
 
+
 def viterbi(train, test):
 
     '''
@@ -135,9 +138,10 @@ def viterbi(train, test):
     '''
 
     # Turn off before checking the performance with run.py
-    train, test = get_dataset(train, test)
+    # train, test = get_dataset(train, test)
 
     word_tag_infos, _, pos_counts = get_tag_info(train, discard_se=False)
+    # print(pos_counts)
 
     # for k, v in word_tag_infos.items():
     #     print(k, v)
@@ -172,53 +176,67 @@ def viterbi(train, test):
     # 초기 확률 분포 -> START 다음에 나오는 애들 확률로
     initial_probability_distribution = transition_probability['START']
     tag_state_space = pos_counts.keys()
+    # tag_state_space = [tag for tag in pos_counts.keys() if tag not in ["START", "END"]]
 
-    # Unseen Word 처리
-    # for tag in tag_state_space:
-    #     if tag not in initial_probability_distribution:
-    #         initial_probability_distribution[tag] = EPSILON # epsilon
-    # print(initial_probability_distribution)
-    """ WARNING: 확률 합이 1이 안 됨. """
-
-
-    for k, v in emission_probability.items():
-        print(k, v)
-
-    
-    for sentence in test:
-        V = defaultdict(lambda: defaultdict(float))  # Viterbi Matrix
-        T = len(sentence) 
-
-        # START, END 제외
-        prev_tag = None
-        for i in range(1, T-1):
-            word = sentence[i]
-            max_prob = 0
-            for tag in tag_state_space:
-                ip = initial_probability_distribution[tag]
-                ep = emission_probability[tag][word]
-                if ip == 0: ip = EPSILON
-                if ep == 0: ep = EPSILON
-
-                if i == 1: # Initial
-                    V[word][tag] = log(ip) + log(ep)
-                    prev_tag = tag
-                    print(V[word][tag])
-                    continue
-
-                V[word][tag] = max(max_prob, V)
-
-
-    
     # for k, v in emission_probability.items():
     #     print(k, v)
 
     # for k, v in transition_probability.items():
     #     print(k, v)
-            
 
-    return 0       
+    tagged_sentences_result = []
+    for sentence in test:
+        #sentence = test[0]
+        tagged_sentence = [("START", "START")]
+        V = defaultdict(lambda: defaultdict(float))  # Viterbi Matrix -> 각 단계에서의 최대 확률 저장
+        BT = defaultdict(lambda: defaultdict(str))
+        T = len(sentence)
 
+        # START, END 제외
+        prev_word = sentence[0]
+        for i in range(1, T-1): # 어디서부터 어디까지 시작해야 할지..
+            curr_word = sentence[i]
+            for curr_tag in tag_state_space:
+                ep = emission_probability[curr_tag][curr_word]
+                if i == 0: # Initial
+                    ip = initial_probability_distribution[curr_tag]
+                    V[curr_word][curr_tag] = safe_log(ip) + safe_log(ep)
+                    BT[curr_word][curr_tag] = curr_tag
+                else:
+                    max_prob = -float('inf')
+                    max_prev_tag = None
+                    for prev_tag in tag_state_space:
+                        candidate_prob = V[prev_word][prev_tag] + safe_log(transition_probability[prev_tag][curr_tag]) + safe_log(ep)
+                        if candidate_prob > max_prob:
+                            max_prob = candidate_prob
+                            max_prev_tag = prev_tag
+                    # print(curr_word, max_prob, max_prev_tag)
+                    V[curr_word][curr_tag] = max_prob
+                    BT[curr_word][curr_tag] = max_prev_tag
+            prev_word = curr_word
+
+        last_word = prev_word
+        last_word_tag = None
+        max_prob = -float('inf')
+        for tag, prob in V[last_word].items():
+            if prob > max_prob:
+                max_prob = prob
+                last_word_tag = tag
+        tagged_sentence.insert(1, (last_word, last_word_tag))
+        prev_tag = BT[last_word][last_word_tag]
+
+        # Backtracking
+        for i in range(T-3, 0, -1):
+            curr_word = sentence[i]
+            tagged_sentence.insert(1, (curr_word, prev_tag))
+            prev_tag = BT[curr_word][prev_tag]
+
+        tagged_sentence.append(("END", "END"))
+        print(tagged_sentence)
+    
+        tagged_sentences_result.append(tagged_sentence)
+        
+    return tagged_sentences_result
 
 
 def viterbi_ec(train, test):
