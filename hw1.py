@@ -4,7 +4,7 @@ import numpy as np
 
 EPSILON = 1e-5
 
-def smoothed_prob(arr, alpha=1):
+def smoothed_prob(arr, alpha=0.005):
     '''
     list of probabilities smoothed by Laplace smoothing
     input: arr (list or numpy.ndarray of integers which are counts of any elements)
@@ -239,6 +239,12 @@ def viterbi(train, test):
         
     return tagged_sentences_result
 
+def get_emission_probability(curr_word, curr_tag, seen_words_emission_probability):
+    if curr_word in seen_words_emission_probability[curr_tag]:
+        return seen_words_emission_probability[curr_tag][curr_word]
+    else:
+        return smoothed_prob
+    
 
 def viterbi_ec(train, test):
 
@@ -251,6 +257,9 @@ def viterbi_ec(train, test):
     '''
 
     word_tag_infos, _, pos_counts = get_tag_info(train, discard_se=False)
+    #tag_state_space = list(pos_counts.keys())
+    tag_state_space = [pos for pos in pos_counts.keys() if pos != 'X']
+    # print("tag_state_space", tag_state_space)
 
     # 특정 태그가 특정 단어를 생성할 확률: Emission Probability
     word_counts_by_tag = defaultdict(lambda: defaultdict(float))
@@ -259,31 +268,47 @@ def viterbi_ec(train, test):
             tag_counts_by_word = meta[0][tag] # 한 단어가 어떤 품사로 몇 번씩 사용되었나
             word_counts_by_tag[tag][word] = tag_counts_by_word # 특정 태그에 해당하는 단어들 각각의 등장 횟수
 
-
-    for k, v in word_counts_by_tag.items():
-        print(k, v)
-            # total_counts_of_a_tag = pos_counts[tag]
-            # emission_probability[tag][word] = word_counts_after_tag / total_counts_of_a_tag # {<tag>: {<word>: <prob>, <word>: <prob>, ...}, ...}
+            
+    # Smoothed Emission_probability 
+    seen_words_emission_probability = defaultdict(lambda: defaultdict(float))
+    for tag in tag_state_space:
+        # print(word_counts_by_tag[tag])
+        count_arr = list(word_counts_by_tag[tag].values())
+        # print(count_arr)
+        count_arr.append(0)
+        smoothed = smoothed_prob(count_arr)
+        i = 0
+        for key in word_counts_by_tag[tag]:
+            seen_words_emission_probability[tag][key] = smoothed[i]
+            i += 1
+        seen_words_emission_probability[tag]['unknown'] = smoothed[i]
+    # print(seen_words_emission_probability['MODAL'])  # Smoothing 결과
 
     # 특정 태그 뒤에 특정 태그가 올 확률: Transition Probability
-    transition_probability = defaultdict(lambda: defaultdict(float))
+    tag_counts_by_tag = defaultdict(lambda: defaultdict(float))
     for sentence in train:
         for i in range(len(sentence) - 1):
             current_tag = sentence[i][1]
             next_tag = sentence[i+1][1]
-            transition_probability[current_tag][next_tag] += 1
-    
-    for tag, next_tags in transition_probability.items():
-        total_next_tags = 0
-        for _, counts in next_tags.items():
-            total_next_tags += counts
-                        
-        for next_tag in next_tags.items():
-            transition_probability[tag][next_tag[0]] = next_tag[1] / total_next_tags
+            tag_counts_by_tag[current_tag][next_tag] += 1
 
-    # 초기 확률 분포 -> START 다음에 나오는 애들 확률로
+    for tag in tag_counts_by_tag.keys():
+        tag_counts_by_tag[tag]['unknown'] = 0
+    
+    transition_probability = defaultdict(lambda: defaultdict(float))
+    # print(tag_state_space)
+    for tag in tag_state_space:
+        count_arr = list(tag_counts_by_tag[tag].values())
+        smoothed = smoothed_prob(count_arr)
+        i = 0
+        for key in tag_counts_by_tag[tag]:
+            transition_probability[tag][key] = smoothed[i]
+            i += 1
+
+    # for k, v in transition_probability.items():
+    #     print(k, v)
+    
     initial_probability_distribution = transition_probability['START']
-    tag_state_space = list(pos_counts.keys())
     
     tagged_sentences_result = []
     for sentence in test:
@@ -299,18 +324,22 @@ def viterbi_ec(train, test):
             for curr_tag_idx in range(len(tag_state_space)):
                 curr_tag = tag_state_space[curr_tag_idx]
                 curr_word = sentence[curr_word_idx]
-                ep = "***"  #❗ 수정
+                ep = seen_words_emission_probability[curr_tag].get(curr_word, False)
+                if ep == False:
+                    ep = seen_words_emission_probability[curr_tag].get('unknown')
                 if i == 0:
                     ip = initial_probability_distribution[curr_tag]
-                    V[curr_word_idx][curr_tag_idx] = np.log(ip + EPSILON) + ep
+                    V[curr_word_idx][curr_tag_idx] = np.log(ip + EPSILON) + np.log(ep)
                     BT[curr_word_idx][curr_tag_idx] = curr_tag_idx
                 else:
                     max_prob = -np.inf
                     max_prev_tag_idx = -1
                     for prev_tag_idx in range(len(tag_state_space)):
                         prev_tag = tag_state_space[prev_tag_idx]
-                        tp = transition_probability[prev_tag][curr_tag]
-                        candidate_prob = V[prev_word_idx][prev_tag_idx] + np.log(tp + EPSILON) + ep
+                        tp = transition_probability[prev_tag].get(curr_tag, False)
+                        if tp == False:
+                            tp = transition_probability[prev_tag]['unknown']
+                        candidate_prob = V[prev_word_idx][prev_tag_idx] + np.log(tp + EPSILON) + np.log(ep)
                         if candidate_prob > max_prob:
                             max_prob = candidate_prob
                             max_prev_tag_idx = prev_tag_idx
@@ -327,13 +356,18 @@ def viterbi_ec(train, test):
         for curr_word_idx in range (T-2, 0, -1):
             curr_word = sentence[curr_word_idx]
             tagged_sentence.append((curr_word, tag_state_space[prev_tag_idx]))
+            # print((curr_word, tag_state_space[prev_tag_idx]))
             prev_tag_idx = int(BT[curr_word_idx][prev_tag_idx])
+            #print(prev_tag_idx)
 
         tagged_sentence.append(("START", "START"))
         tagged_sentence.reverse()
+        # print(tagged_sentence)
         tagged_sentences_result.append(tagged_sentence)
+
+        # print(V)
         
     return tagged_sentences_result
 
 if __name__ == "__main__":
-    print(smoothed_prob([1, 1, 1, 2], alpha=1))
+    print(smoothed_prob([0, 0, 20, 30, 40], alpha=1))

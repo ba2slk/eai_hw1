@@ -149,7 +149,7 @@ if __name__ == "__main__":
     train_set = load_dataset('data/brown-training.txt')
     dev_set = load_dataset('data/brown-test.txt')
 
-    for model in (hw1.baseline, hw1.viterbi_ec): # hw1.viterbi,
+    for model in (hw1.baseline, hw1.viterbi, hw1.viterbi_ec): # hw1.viterbi,
 
         start_time = time.time()
         predicted = model(train_set, strip_tags(dev_set))
