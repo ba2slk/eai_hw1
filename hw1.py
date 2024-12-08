@@ -257,8 +257,8 @@ def viterbi_ec(train, test):
     '''
 
     word_tag_infos, _, pos_counts = get_tag_info(train, discard_se=False)
-    #tag_state_space = list(pos_counts.keys())
-    tag_state_space = [pos for pos in pos_counts.keys() if pos != 'X']
+    tag_state_space = list(pos_counts.keys())
+    # tag_state_space = [pos for pos in pos_counts.keys() if pos != 'X']
     # print("tag_state_space", tag_state_space)
 
     # 특정 태그가 특정 단어를 생성할 확률: Emission Probability
@@ -272,10 +272,10 @@ def viterbi_ec(train, test):
     # train 데이터에서 한 번만 등장한 단어들의 smoothed_prob
     once_tag_lists = list()
     for k, v in word_counts_by_tag.items():
-        if k != 'X':
-            for _, count in v.items():
-                if count == 1:
-                    once_tag_lists.append(k)
+        # if k != 'X':
+        for _, count in v.items():
+            if count == 1:
+                once_tag_lists.append(k)
 
     for tag in tag_state_space:
         if tag not in set(once_tag_lists):
