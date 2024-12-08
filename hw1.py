@@ -268,6 +268,34 @@ def viterbi_ec(train, test):
             tag_counts_by_word = meta[0][tag] # 한 단어가 어떤 품사로 몇 번씩 사용되었나
             word_counts_by_tag[tag][word] = tag_counts_by_word # 특정 태그에 해당하는 단어들 각각의 등장 횟수
 
+
+    # train 데이터에서 한 번만 등장한 단어들의 smoothed_prob
+    once_tag_lists = list()
+    for k, v in word_counts_by_tag.items():
+        if k != 'X':
+            for _, count in v.items():
+                if count == 1:
+                    once_tag_lists.append(k)
+
+    for tag in tag_state_space:
+        if tag not in set(once_tag_lists):
+            once_tag_lists.append(tag)
+
+    once_smoothed_prob_result = defaultdict()
+    once_counter = Counter(once_tag_lists)
+    #print(once_counter)
+    once_tag_counts = list(once_counter.values())
+    smoothed_once_prob = smoothed_prob(once_tag_counts)
+    #print(len(smoothed_once_prob))
+    #print(len(once_tag_lists))
+    
+    # print(smoothed_once_prob)
+    once_keys_list = list(once_counter.keys())
+    for i in range(len(once_counter)):
+        once_smoothed_prob_result[once_keys_list[i]] = smoothed_once_prob[i]
+    # for k, v in once_smoothed_prob_result.items():
+    #     print(k, v)
+
             
     # Smoothed Emission_probability 
     seen_words_emission_probability = defaultdict(lambda: defaultdict(float))
@@ -326,7 +354,7 @@ def viterbi_ec(train, test):
                 curr_word = sentence[curr_word_idx]
                 ep = seen_words_emission_probability[curr_tag].get(curr_word, False)
                 if ep == False:
-                    ep = seen_words_emission_probability[curr_tag].get('unknown')
+                    ep = seen_words_emission_probability[curr_tag].get('unknown') * once_smoothed_prob_result[curr_tag] 
                 if i == 0:
                     ip = initial_probability_distribution[curr_tag]
                     V[curr_word_idx][curr_tag_idx] = np.log(ip + EPSILON) + np.log(ep)
