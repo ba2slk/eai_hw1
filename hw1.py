@@ -397,5 +397,5 @@ def viterbi_ec(train, test):
         
     return tagged_sentences_result
 
-if __name__ == "__main__":
-    print(smoothed_prob([0, 0, 20, 30, 40], alpha=1))
+# if __name__ == "__main__":
+#     print(smoothed_prob([0, 0, 20, 30, 40], alpha=1))
